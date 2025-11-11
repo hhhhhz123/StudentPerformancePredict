@@ -1,4 +1,28 @@
+# R files
 .Rproj.user
 .Rhistory
 .RData
 .Ruserdata
+*.Rproj
+
+# RMarkdown output
+*.html
+*.pdf
+*_cache/
+*_files/
+
+# System files
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+
+# Temporary files
+*.tmp
+*.temp
+
+# Optional: Uncomment if data/model files are too large for GitHub
+# data/raw/*.csv
+# data/processed/*.rda
+# models/*.rds
