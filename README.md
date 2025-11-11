@@ -14,11 +14,14 @@ Predict student exam scores based on study habits, family background, and school
 9. Build Shiny app using prediction function
 
 ## How to Run
+0. Clone
 
 1. Install Packages
+
 install.packages(c("tidyverse", "caret", "glmnet", "shiny"))
 
 2. Run Analysis
+
 rmarkdown::render("analysis/eda.Rmd")
 
 rmarkdown::render("analysis/model_training.Rmd")
@@ -26,6 +29,7 @@ rmarkdown::render("analysis/model_training.Rmd")
 rmarkdown::render("analysis/final_evaluation.Rmd")
 
 3. Launch App
+
 shiny::runApp("inst/shiny-app")
 
 ## Model Performance
