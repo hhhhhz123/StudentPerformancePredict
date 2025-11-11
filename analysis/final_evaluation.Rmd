@@ -1,0 +1,51 @@
+---
+title: "Final Model Evaluation"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+```
+
+# Load Everything
+
+```{r}
+library(caret)
+library(ggplot2)
+
+source("../R/07_diagnostics.R")
+
+load("../data/processed/test_data.rda")
+final_model <- readRDS("../models/final_model.rds")
+```
+
+# Evaluate Model
+
+```{r}
+eval_result <- evaluate_model(final_model, test_data)
+```
+
+# Diagnostic Plots
+
+```{r, fig.width=10, fig.height=7}
+plot_diagnostics(eval_result)
+```
+
+# Statistical Tests
+
+```{r}
+residual_tests(eval_result)
+```
+
+# Error Analysis
+
+```{r}
+error_analysis(eval_result)
+```
+
+# Summary
+
+Model performance on test set:
+- RMSE: `r round(eval_result$rmse, 2)` points
+- R²: `r round(eval_result$r2, 3)` (explains `r round(eval_result$r2*100, 1)`% of variance)
+- Within ±10 points: `r round(mean(abs(eval_result$residuals) <= 10) * 100, 1)`%

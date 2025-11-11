@@ -1,0 +1,83 @@
+---
+title: "Model Training"
+output: html_document
+---
+
+```{r}
+library(tidyverse)
+library(caret)
+library(glmnet)
+
+# Load functions
+source("../R/01_data_loading.R")
+source("../R/02_data_splitting.R")
+source("../R/03_model_stepwise.R")
+source("../R/04_model_lasso.R")
+source("../R/05_model_comparison.R")
+```
+
+# 1. Load Data
+
+```{r}
+data <- load_clean_data("../data/raw/StudentPerformanceFactors.csv")
+```
+
+# 2. Split Data
+
+```{r}
+split <- split_data(data, train_prop = 0.7)
+train_data <- split$train
+test_data <- split$test
+
+# Save
+save(train_data, file = "../data/processed/train_data.rda")
+save(test_data, file = "../data/processed/test_data.rda")
+```
+
+# 3. Train Models
+
+## Stepwise
+
+```{r}
+stepwise_res <- train_stepwise(train_data)
+```
+
+## Lasso
+
+```{r}
+lasso_res <- train_lasso(train_data)
+plot(lasso_res$model)
+```
+
+## Ridge
+
+```{r}
+ridge_res <- train_ridge(train_data)
+plot(ridge_res$model)
+```
+
+# 4. Compare
+
+```{r}
+comparison <- compare_models(stepwise_res, lasso_res, ridge_res)
+```
+
+# 5. Save Models
+
+```{r}
+saveRDS(stepwise_res$model, "../models/stepwise_model.rds")
+saveRDS(lasso_res$model, "../models/lasso_model.rds")
+saveRDS(ridge_res$model, "../models/ridge_model.rds")
+
+# Save best
+best_name <- comparison$Model[1]
+if (best_name == "Lasso") {
+  saveRDS(lasso_res$model, "../models/final_model.rds")
+} else if (best_name == "Ridge") {
+  saveRDS(ridge_res$model, "../models/final_model.rds")
+} else {
+  saveRDS(stepwise_res$model, "../models/final_model.rds")
+}
+
+cat("Saved best model:", best_name, "\n")
+```

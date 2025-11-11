@@ -1,0 +1,138 @@
+---
+title: "EDA - Student Performance"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+```
+
+# Load Packages
+
+```{r}
+library(tidyverse)
+library(corrplot)
+library(knitr)
+```
+
+# 1. Load Raw Data
+
+```{r}
+# Load WITHOUT removing missing values first
+data_raw <- read.csv("../data/raw/StudentPerformanceFactors.csv", 
+                     stringsAsFactors = TRUE)
+
+cat("Raw data dimensions:", nrow(data_raw), "rows,", ncol(data_raw), "columns\n")
+```
+
+# 2. Missing Data Analysis
+
+## 2.1 Missing Values Summary
+
+```{r}
+# Check for NAs and empty strings
+missing_summary <- data.frame(
+  Variable = names(data_raw),
+  NA_Count = colSums(is.na(data_raw)),
+  Empty_String_Count = colSums(data_raw == "", na.rm = TRUE),
+  Total_Missing = colSums(is.na(data_raw)) + colSums(data_raw == "", na.rm = TRUE),
+  Percent_Missing = round(100 * (colSums(is.na(data_raw)) + colSums(data_raw == "", na.rm = TRUE)) / nrow(data_raw), 2)
+)
+
+# Show only variables with missing data
+missing_summary_nonzero <- missing_summary %>%
+  filter(Total_Missing > 0) %>%
+  arrange(desc(Total_Missing))
+
+kable(missing_summary_nonzero, 
+      caption = "Variables with Missing Data")
+```
+
+## 2.2 Total Missing Data
+
+```{r}
+total_missing <- sum(missing_summary$Total_Missing)
+total_cells <- nrow(data_raw) * ncol(data_raw)
+
+cat("Total missing values:", total_missing, "\n")
+cat("Overall missing percentage:", round(100 * total_missing / total_cells, 2), "%\n")
+
+rows_with_missing <- sum(rowSums(is.na(data_raw) | data_raw == "") > 0)
+cat("\nRows with missing:", rows_with_missing, 
+    "(", round(100 * rows_with_missing / nrow(data_raw), 2), "%)\n")
+```
+
+# 3. Clean Data
+
+```{r}
+# Convert empty strings to NA
+data_raw[data_raw == ""] <- NA
+
+# Remove rows with missing values
+data <- na.omit(data_raw)
+
+cat("\n=== CLEANING SUMMARY ===\n")
+cat("Before: ", nrow(data_raw), "rows\n")
+cat("After:  ", nrow(data), "rows\n")
+cat("Removed:", nrow(data_raw) - nrow(data), "rows\n")
+```
+
+# 4. Target Variable
+
+```{r}
+summary(data$Exam_Score)
+
+ggplot(data, aes(x = Exam_Score)) +
+  geom_histogram(bins = 30, fill = "steelblue") +
+  theme_minimal() +
+  labs(title = "Distribution of Exam Scores")
+```
+
+# 5. Key Relationships
+
+## Hours Studied
+
+```{r}
+ggplot(data, aes(x = Hours_Studied, y = Exam_Score)) +
+  geom_point(alpha = 0.3) +
+  geom_smooth(method = "lm", color = "red") +
+  theme_minimal()
+
+cat("Correlation:", round(cor(data$Hours_Studied, data$Exam_Score), 3))
+```
+
+## Attendance
+
+```{r}
+ggplot(data, aes(x = Attendance, y = Exam_Score)) +
+  geom_point(alpha = 0.3) +
+  geom_smooth(method = "lm", color = "red") +
+  theme_minimal()
+
+cat("Correlation:", round(cor(data$Attendance, data$Exam_Score), 3))
+```
+
+## Motivation Level
+
+```{r}
+ggplot(data, aes(x = Motivation_Level, y = Exam_Score, fill = Motivation_Level)) +
+  geom_boxplot() +
+  theme_minimal()
+
+data %>%
+  group_by(Motivation_Level) %>%
+  summarise(n = n(), Mean = mean(Exam_Score)) %>%
+  kable()
+```
+
+# 6. Correlation Matrix
+
+```{r}
+numeric_vars <- data %>% select_if(is.numeric)
+cor_matrix <- cor(numeric_vars)
+corrplot(cor_matrix, method = "color", type = "upper")
+```
+
+# Summary
+
+Clean data: `r nrow(data)` observations ready for modeling!
