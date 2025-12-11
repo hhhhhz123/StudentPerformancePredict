@@ -1,0 +1,160 @@
+---
+title: "Outlier Analysis"
+output: html_document
+---
+
+```{r}
+library(tidyverse)
+library(caret)
+source("../R/01_data_loading.R")
+source("../R/07_diagnostics.R")
+```
+
+# Load data
+
+```{r}
+# Load original data
+data <- load_clean_data("../data/raw/StudentPerformanceFactors.csv")
+```
+
+# Find outliers
+
+```{r}
+# Fit model on all data
+model <- lm(Exam_Score ~ ., data = data)
+
+# Get residuals
+resid <- residuals(model)
+std_resid <- resid / sd(resid)
+
+# Find outliers (residual > 3 SD)
+outliers <- which(abs(std_resid) > 3)
+
+print(paste("Found", length(outliers), "outliers"))
+print(paste("That's", round(100*length(outliers)/nrow(data), 2), "% of data"))
+```
+
+# Remove outliers
+
+```{r}
+# Remove them
+data_clean <- data[-outliers, ]
+
+print(paste("Original:", nrow(data), "rows"))
+print(paste("Clean:", nrow(data_clean), "rows"))
+```
+
+# Split into train and test
+
+```{r}
+set.seed(123)
+train_index <- createDataPartition(data_clean$Exam_Score, p = 0.7, list = FALSE)
+
+train_clean <- data_clean[train_index, ]
+test_clean <- data_clean[-train_index, ]
+
+# Save
+save(train_clean, file = "../data/processed/train_data_clean.rda")
+save(test_clean, file = "../data/processed/test_data_clean.rda")
+```
+
+# Train stepwise model
+
+```{r}
+stepwise_clean <- train(
+  Exam_Score ~ .,
+  data = train_clean,
+  method = "lmStepAIC",
+  direction = "backward",
+  trControl = trainControl(method = "cv", number = 10),
+  trace = FALSE
+)
+
+print(paste("CV-RMSE:", round(min(stepwise_clean$results$RMSE), 3)))
+```
+
+# Train LASSO
+
+```{r}
+x_train <- model.matrix(Exam_Score ~ ., train_clean)[, -1]
+y_train <- train_clean$Exam_Score
+
+lasso_clean <- train(
+  x = x_train,
+  y = y_train,
+  method = "glmnet",
+  tuneGrid = expand.grid(alpha = 1, lambda = seq(0.001, 1, length = 50)),
+  trControl = trainControl(method = "cv", number = 10)
+)
+
+print(paste("CV-RMSE:", round(min(lasso_clean$results$RMSE), 3)))
+```
+
+# Train Ridge
+
+```{r}
+ridge_clean <- train(
+  x = x_train,
+  y = y_train,
+  method = "glmnet",
+  tuneGrid = expand.grid(alpha = 0, lambda = seq(0.001, 1, length = 50)),
+  trControl = trainControl(method = "cv", number = 10)
+)
+
+print(paste("CV-RMSE:", round(min(ridge_clean$results$RMSE), 3)))
+```
+
+# Compare models
+
+```{r}
+results <- data.frame(
+  Model = c("Stepwise", "LASSO", "Ridge"),
+  RMSE = c(
+    min(stepwise_clean$results$RMSE),
+    min(lasso_clean$results$RMSE),
+    min(ridge_clean$results$RMSE)
+  )
+)
+
+results <- results %>% arrange(RMSE)
+print(results)
+
+# Save best model (stepwise won)
+saveRDS(stepwise_clean, "../models/final_model_clean.rds")
+```
+
+# Test on clean test data
+
+```{r}
+eval_clean <- evaluate_model(stepwise_clean, test_clean)
+```
+
+# Plots
+
+```{r, fig.width=10, fig.height=7}
+plot_diagnostics(eval_clean)
+```
+
+# Compare with original
+
+```{r}
+# Load original
+load("../data/processed/test_data.rda")
+model_original <- readRDS("../models/final_model.rds")
+
+# Predict
+pred_original <- predict(model_original, test_data)
+resid_original <- test_data$Exam_Score - pred_original
+
+# Metrics
+rmse_original <- sqrt(mean(resid_original^2))
+r2_original <- cor(test_data$Exam_Score, pred_original)^2
+
+print("ORIGINAL:")
+print(paste("RMSE:", round(rmse_original, 3)))
+print(paste("R²:", round(r2_original, 3)))
+
+print("CLEANED:")
+print(paste("RMSE:", round(eval_clean$rmse, 3)))
+print(paste("R²:", round(eval_clean$r2, 3)))
+```

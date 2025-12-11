@@ -1,9 +1,17 @@
 #' Simple Model Evaluation
 #' @export
-evaluate_model <- function(model, test_data) {
+evaluate_model <- function(model, test_data,base_path = "..") {
 
-  # Load training data to get factor levels
-  load("../data/processed/train_data.rda")
+  # Load training data(not sure which directory that user are using)
+  if (file.exists("../data/processed/train_data_clean.rda")) {
+    load("../data/processed/train_data_clean.rda", envir = environment())
+    train_data <- train_clean
+  } else if (file.exists("data/processed/train_data_clean.rda")) {
+    load("data/processed/train_data_clean.rda", envir = environment())
+    train_data <- train_clean
+  } else {
+    stop("train_data_clean.rda not found")
+  }
 
   # Fix factor levels in test data
   for (col in names(train_data)) {
