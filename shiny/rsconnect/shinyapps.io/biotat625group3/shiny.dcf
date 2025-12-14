@@ -1,0 +1,10 @@
+name: shiny
+title:
+username: biotat625group3
+account: biotat625group3
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 16240005
+bundleId: 11274662
+url: https://biotat625group3.shinyapps.io/shiny/
+version: 1

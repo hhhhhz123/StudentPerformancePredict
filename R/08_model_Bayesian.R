@@ -87,7 +87,7 @@ train_Bayesian <- function(dat){
   pip        <- colMeans(gamma_mat)
   names(pip) <- colnames(X_m)
 
-  # posterior mean of beta (not the mode)
+  # posterior mean of beta
   beta_cols <- grep("^beta\\[", colnames(mcmc_all))
   beta_mat  <- mcmc_all[, beta_cols, drop = FALSE]
   beta_mean <- colMeans(beta_mat)

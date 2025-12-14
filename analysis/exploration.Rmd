@@ -1,0 +1,283 @@
+---
+title: "625-final"
+author: "Guanyi Wu"
+date: "2025-12-03"
+output: pdf_document
+---
+
+Dataset exploration
+
+pre-load
+
+```{r}
+library(dplyr)
+library(ggplot2)
+library(tidyr)
+library(knitr)
+library(kableExtra)
+```
+
+load dataset
+
+```{r}
+dats <- read.csv("StudentPerformancePredict/data/raw/StudentPerformanceFactors.csv")
+```
+
+shape and type
+
+```{r}
+shape <- dim(dats)
+summary(dats)
+```
+
+7 numeric columns: (1)Hours_Studied, (2)Attendance, (3)Sleep_Hours, (4)Previous_Scores, (5)Tutoring_Sessions, (6)Physical_Activity, (7)Exam_Score
+
+13 categorical columns: (1)Parental_Involvement, (2)Access_to_Resources, (3)Extracurricular_Activities, (4)Motivation_Level, (5)Internet_Access, (6)Family_Income, (7)Teacher_Quality, (8)School_Type, (9)Peer_Influence, (10)Learning_Disabilities, (11)Parental_Education_Level, (12)Distance_from_Home, (13)Gender
+
+Missing value
+
+```{r}
+dats[dats == ""] <- NA
+colSums(is.na(dats))
+na_df <- data.frame(
+  variable = names(dats),
+  na_count = colSums(is.na(dats))
+)
+
+ggplot(na_df, aes(x = variable, y = na_count)) +
+  geom_col() +
+  coord_flip() +
+  labs(title = "Missing Values per Column",
+       x = "Column",
+       y = "Number of NA") +
+  theme_minimal() +
+  theme(axis.text.y = element_text(size = 8))
+```
+
+Check the distuibution of columns with missing value
+
+```{r}
+cols <- c("Parental_Education_Level",
+          "Teacher_Quality",
+          "Distance_from_Home")
+
+for (col in cols) {
+  
+  df_plot <- dats %>%
+    filter(!is.na(.data[[col]])) %>%
+    count(.data[[col]]) %>%
+    arrange(desc(n))
+  
+  p <- ggplot(df_plot, aes(x = .data[[col]], y = n, fill = .data[[col]])) +
+  geom_col(width = 0.7, alpha = 0.9, color = "white") +
+  geom_text(aes(label = n),
+            vjust = -0.3,
+            size = 5) +
+  scale_fill_brewer(palette = "Set2") +
+  labs(title = col, x = "", y = "Count") +
+  theme_minimal(base_size = 15) +
+  theme(
+    legend.position = "none",
+    plot.title = element_text(hjust = 0.5, face = "bold")
+  ) +
+  expand_limits(y = max(df_plot$n) * 1.15)
+  
+  print(p)
+}
+```
+
+Replace the missing values in each column with its most frequent value.
+
+```{r}
+dats <- dats %>%
+  mutate(
+    Parental_Education_Level = replace_na(Parental_Education_Level, "High School"),
+    Teacher_Quality          = replace_na(Teacher_Quality, "Medium"),
+    Distance_from_Home       = replace_na(Distance_from_Home, "Near")
+  )
+#colSums(is.na(dats))
+```
+
+Also, we found outlier value 101 in Exam Score, so we replace it to 100.
+
+```{r}
+dats$Exam_Score[dats$Exam_Score == 101] <- 100
+summary(dats)
+```
+
+Next we check the distribution of each column
+
+for numeric columns
+
+```{r}
+numeric_cols <- c(
+  "Hours_Studied", "Attendance", "Sleep_Hours",
+  "Previous_Scores", "Tutoring_Sessions",
+  "Physical_Activity", "Exam_Score"
+)
+
+
+num_colors <- RColorBrewer::brewer.pal(n = 7, "Set2")
+
+dats %>%
+  select(all_of(numeric_cols)) %>%
+  pivot_longer(everything(),
+               names_to = "variable",
+               values_to = "value") %>%
+  mutate(variable = factor(variable, levels = numeric_cols)) %>%
+  ggplot(aes(x = value, fill = variable)) +
+  geom_density(alpha = 0.6, color = NA) +
+  facet_wrap(~ variable, scales = "free", ncol = 3) +
+  scale_fill_manual(values = num_colors) +
+  theme_minimal(base_size = 15) +
+  theme(
+    legend.position = "none",
+    strip.text = element_text(face = "bold", size = 14)
+  ) +
+  labs(
+    title = "Distribution of Numerical Features",
+    x = "", y = ""
+  )
+```
+
+for categorical columns
+
+```{r,fig.width = 12, fig.height = 20}
+categorical_cols <- c(
+  "Parental_Involvement", "Access_to_Resources",
+  "Extracurricular_Activities", "Motivation_Level",
+  "Internet_Access", "Family_Income",
+  "Teacher_Quality", "School_Type",
+  "Peer_Influence", "Learning_Disabilities",
+  "Parental_Education_Level", "Distance_from_Home",
+  "Gender"
+)
+
+cat_colors <- RColorBrewer::brewer.pal(n = 12, "Set3")
+cat_colors <- c(cat_colors, "#A8D5BA")  
+
+dats %>%
+  select(all_of(categorical_cols)) %>%
+  pivot_longer(everything(),
+               names_to = "variable",
+               values_to = "value") %>%
+  mutate(variable = factor(variable, levels = categorical_cols)) %>%
+  ggplot(aes(x = value, fill = variable)) +
+  geom_bar(color = "white") +
+  geom_text(
+    stat = "count",
+    aes(label = after_stat(count)),
+    vjust = -0.2, size = 3
+  ) +
+  facet_wrap(~ variable, scales = "free", ncol = 2) +
+  scale_fill_manual(values = cat_colors) +
+  theme_minimal(base_size = 15) +
+  theme(
+    legend.position = "none",
+    axis.text.x = element_text(angle = 30, hjust = 1),
+    strip.text = element_text(face = "bold", size = 14)
+  ) +
+  labs(
+    title = "Distribution of Categorical Features",
+    x = "", y = ""
+  )
+```
+
+```{r}
+num_dat <- dats %>% select(where(is.numeric))
+
+summary_tbl <- data.frame(
+  Variable = names(num_dat),
+  Min      = sapply(num_dat, min,    na.rm = TRUE),
+  Q1       = sapply(num_dat, quantile, 0.25, na.rm = TRUE),
+  Median   = sapply(num_dat, median, na.rm = TRUE),
+  Mean     = sapply(num_dat, mean,   na.rm = TRUE),
+  Q3       = sapply(num_dat, quantile, 0.75, na.rm = TRUE),
+  Max      = sapply(num_dat, max,    na.rm = TRUE)
+)
+
+summary_tbl %>%
+  kable(digits = 2, caption = "Summary statistics for numeric variables") %>%
+  kable_styling(full_width = FALSE, bootstrap_options = c("striped", "hover"))
+```
+
+
+corralation
+```{r}
+library(ggplot2)
+library(reshape2)
+
+
+X <- model.matrix(~ . - 1, data = dats)
+cor_mat <- cor(X, use = "pairwise.complete.obs")
+
+
+cm_long <- reshape2::melt(cor_mat, varnames = c("Var1", "Var2"), value.name = "corr")
+
+
+cm_long$Var1 <- factor(cm_long$Var1, levels = rownames(cor_mat))
+cm_long$Var2 <- factor(cm_long$Var2, levels = colnames(cor_mat))
+
+
+target_col <- tail(colnames(cor_mat), 1)
+
+ggplot(cm_long, aes(x = Var2, y = Var1, fill = corr)) +
+
+  geom_tile(aes(color = Var2 == target_col), linewidth = 0.7) +
+  scale_color_manual(values = c("FALSE" = NA, "TRUE" = "yellow"), guide = "none") +
+
+
+  geom_text(aes(label = sprintf("%.1f", corr)), size = 2) +
+
+  
+  scale_fill_gradient2(
+    low = "#313695",
+    mid = "white",
+    high = "#A50026",
+    midpoint = 0,
+    limits = c(-1, 1)
+  ) +
+
+  coord_fixed() +
+  labs(x = NULL, y = NULL) +
+  theme_minimal(base_size = 8) +
+  theme(
+    axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1),
+    panel.grid = element_blank()
+  )
+```
+
+Linear relationship
+
+```{r}
+library(viridis)
+ggplot(dats, aes(x = Hours_Studied,
+                 y = Exam_Score,
+                 color = Attendance)) +
+  geom_point(size = 2, alpha = 0.8) +
+  scale_color_viridis(
+    option = "D",
+    name   = "Attendance"
+  ) +
+  labs(
+    title = "Study Hours and Attendance on Exam",
+    x = "Hours_Studied",
+    y = "Exam_Score"
+  ) +
+  theme_minimal(base_size = 14) +
+  theme(
+    plot.title = element_text(hjust = 0.5)
+  )
+```
+
+
+
+
+
+
+
+
+
+
+
+
